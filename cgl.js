@@ -197,8 +197,6 @@ var cgl =
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_S, this.c.CLAMP_TO_EDGE);
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_T, this.c.CLAMP_TO_EDGE);
 
-		//this.texture_none = this.load_texture('empty.png');
-
 		var vertex = this.create_shader(CGL_2D_VERTEX_SHADER.join("\n"), this.c.VERTEX_SHADER);
 		var fragment = this.create_shader(CGL_2D_FRAGMENT_SHADER.join("\n"), this.c.FRAGMENT_SHADER);
 
@@ -424,6 +422,11 @@ var cgl =
 	bind: function(texture)
 	{
 		this.texture = texture;
+
+		if ( ! texture)
+		{
+			this.unbind();
+		}
 	},
 
 	unbind: function()
