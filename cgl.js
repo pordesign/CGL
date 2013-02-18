@@ -158,8 +158,8 @@ var cgl =
 		this.c.texImage2D(this.c.TEXTURE_2D, 0, this.c.RGBA, this.c.RGBA, this.c.UNSIGNED_BYTE, image);
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MAG_FILTER, this.c.NEAREST);
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MIN_FILTER, this.c.NEAREST);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_S, this.c.CLAMP_TO_EDGE);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_T, this.c.CLAMP_TO_EDGE);
+
+		this.wrap_repeat();
 
 		this.c.bindTexture(this.c.TEXTURE_2D, null);
 		this.loaded++;
@@ -219,7 +219,7 @@ var cgl =
 
 	clear: function()
 	{
-		this.c.clear(this.c.COLOR_BUFFER_BIT, this.c.DEPTH_BUFFER_BIT);
+		this.c.clear(this.c.COLOR_BUFFER_BIT | this.c.DEPTH_BUFFER_BIT);
 	},
 
 	clear_color: function(r, g, b, a)
@@ -423,6 +423,8 @@ var cgl =
 	{
 		this.texture = texture;
 
+		this.c.bindTexture(this.c.TEXTURE_2D, this.texture);
+
 		if ( ! texture)
 		{
 			this.unbind();
@@ -432,6 +434,8 @@ var cgl =
 	unbind: function()
 	{
 		this.texture = this.texture_none;
+
+		this.c.bindTexture(this.c.TEXTURE_2D, this.texture);
 	},
 
 	push_matrix: function()
