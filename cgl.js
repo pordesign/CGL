@@ -131,6 +131,13 @@ var cgl =
 		return program;
 	},
 
+	pow2: function(x)
+	{
+		var logbase2 = Math.log(x) / Math.log(2);
+
+		return Math.round(Math.pow(2.0, parseInt(Math.ceil(logbase2))));
+	},
+
 	load_texture: function(url)
 	{
 		if (typeof this.textures[url] != 'undefined')
@@ -140,11 +147,33 @@ var cgl =
 
 		this.requested++;
 		this.textures[url] = this.c.createTexture();
+
 		var image = new Image();
 
 		image.onload = function()
 		{
-			cgl.init_texture(image, cgl.textures[url]);
+			var w = image.width;
+			var h = image.height;
+			var w2 = cgl.pow2(w);
+			var h2 = cgl.pow2(h);
+
+			if (w != w2 || h != h2)
+			{
+				var canvas = document.createElement('canvas');
+				var ctx = canvas.getContext('2d');
+
+				canvas.width = w2;
+				canvas.height = h2;
+
+				ctx.drawImage(image, 0, 0, w, h, 0, 0, w2, h2);
+
+				cgl.init_texture(ctx.getImageData(0, 0, w2, h2), cgl.textures[url]);
+
+				delete canvas;
+			} else
+			{
+				cgl.init_texture(image, cgl.textures[url]);
+			}
 		};
 
 		image.src = url;
@@ -634,7 +663,7 @@ var cgl =
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MIN_FILTER, this.c.NEAREST);
 	},
 
-	filter_lienar: function()
+	filter_linear: function()
 	{
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MAG_FILTER, this.c.LINEAR);
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MIN_FILTER, this.c.LINEAR);
@@ -656,6 +685,136 @@ var cgl =
 	{
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_S, this.c.REPEAT);
 		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_T, this.c.REPEAT);
+	},
+
+	sprite: function(x, y, s)
+	{
+		var def =
+		{
+			width: 64,
+			height: 64,
+			angle: 0.0,
+			rx: 0.0,
+			ry: 0.0,
+			flipx: false,
+			flipy: false,
+			framex: 0,
+			framey: 0,
+			framesx: 1,
+			framesy: 1
+		};
+
+		for (var k in def)
+		{
+			if (typeof s[k] == 'undefined')
+			{
+				s[k] = def[k];
+			}
+		}
+
+		var w = s.width / 2.0;
+		var h = s.height / 2.0;
+
+
+		var vertices =
+		[
+			[ -w, -h ],
+			[ w, -h ],
+			[ w, h ],
+			[ -w, h ]
+		];
+
+		if (s.angle != 0.0)
+		{
+			var acos = Math.cos(-(s.angle * Math.PI / 180.0));
+			var asin = Math.sin(-(s.angle * Math.PI / 180.0));
+			var rx = s.rx;
+			var ry = s.ry;
+
+			vertices[0] =
+			[
+				(rx - w) * acos + (ry - h) * asin,
+				- (rx - w) * asin + (ry - h) * acos
+			];
+
+			vertices[1] =
+			[
+				(rx + w) * acos + (ry - h) * asin,
+				- (rx + w) * asin + (ry - h) * acos
+			];
+
+			vertices[2] =
+			[
+				(rx + w) * acos + (ry + h) * asin,
+				- (rx + w) * asin + (ry + h) * acos
+			];
+
+			vertices[3] =
+			[
+				(rx - w) * acos + (ry + h) * asin,
+				- (rx - w) * asin + (ry + h) * acos
+			];
+		}
+
+		var texcoords = [];
+		var frame_sizex = 1.0 / s.framesx;
+		var frame_sizey = 1.0 / s.framesy;
+		var frame_stepx = frame_sizex * s.framex;
+		var frame_stepy = frame_sizey * s.framey;
+
+		u = frame_stepx;
+		uw = frame_sizex;
+		v = frame_stepy;
+		vh = frame_sizey;
+
+		texcoords[0] = [ u, v ];
+		texcoords[1] = [ u + uw, v ];
+		texcoords[2] = [ u + uw, v + vh ];
+		texcoords[3] = [ u, v + vh ];
+
+		if (typeof s.s != 'undefined')
+		{
+			texcoords[0][0] = s.s[0];
+			texcoords[1][0] = s.s[1];
+			texcoords[2][0] = s.s[1];
+			texcoords[3][0] = s.s[0];
+
+			u = s.s[0];
+			uw = s.s[1] - s.s[0];
+		}
+
+		if (typeof s.t != 'undefined')
+		{
+			texcoords[0][1] = s.t[0];
+			texcoords[1][1] = s.t[0];
+			texcoords[2][1] = s.t[1];
+			texcoords[3][1] = s.t[1];
+
+			v = s.t[0];
+			vh = s.t[1] - s.t[0];
+		}
+
+		if (s.flipx)
+		{
+			texcoords[0][0] = u + uw;
+			texcoords[1][0] = u;
+			texcoords[2][0] = u;
+			texcoords[3][0]= u + uw;
+		}
+
+		if (s.flipy)
+		{
+			texcoords[0][1] = v + vh;
+			texcoords[1][1] = v + vh;
+			texcoords[2][1] = v;
+			texcoords[3][1] = v;
+		}
+
+		for (var i = 0; i < 4; i++)
+		{
+			cgl.texcoord(texcoords[i][0], texcoords[i][1]);
+			cgl.vertex(x + vertices[i][0], y + vertices[i][1]);
+		}
 	},
 
 	write: function(x, y, text, width, height, align, render, hs, vs)
@@ -727,5 +886,10 @@ var cgl =
 	ready: function(callback)
 	{
 		this.ready_callback = callback;
+
+		if (this.requested == 0)
+		{
+			this.ready_callback();
+		}
 	}
 };
