@@ -1,7 +1,7 @@
 /**
  * Canvas Graphic Library
  *
- * Copyright (c) 2012-2013 wesz/Por Design (pordesign.eu)
+ * Copyright (c) 2012-2013 wesz/ether (onether.com)
  * Dual licensed under the MIT and GPL licenses:
  * http://www.opensource.org/licenses/mit-license.php
  * http://www.gnu.org/licenses/gpl.html
@@ -246,9 +246,18 @@ var cgl =
 		this.c.uniform1i(this.loc.sampler2d, 0);
 	},
 
+	resize: function(width, height, uw, vh)
+	{
+		this.viewport(0, 0, width, height);
+		this.scissor(0, 0, width, height);
+
+		this.load_identity();
+		this.ortho(0, uw, uh, 0, -100, 100);
+	},
+
 	clear: function()
 	{
-		this.c.clear(this.c.COLOR_BUFFER_BIT | this.c.DEPTH_BUFFER_BIT);
+		this.c.clear(this.c.COLOR_BUFFER_BIT);
 	},
 
 	clear_color: function(r, g, b, a)
