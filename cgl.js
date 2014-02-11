@@ -252,7 +252,7 @@ var cgl =
 		this.scissor(0, 0, width, height);
 
 		this.load_identity();
-		this.ortho(0, uw, uh, 0, -100, 100);
+		this.ortho(0, uw, vh, 0, -100, 100);
 	},
 
 	clear: function()
@@ -894,7 +894,7 @@ var cgl =
 
 	ready: function(callback)
 	{
-		this.ready_callback = callback;
+		this.ready_callback = callback || function() {};
 
 		if (this.requested == 0)
 		{
