@@ -8,145 +8,115 @@
  *
  */
 
-var CGL_VERTEX_BUFFER_SIZE = 1024;
-var CGL_POINTS = 1;
-var CGL_LINES = 2;
-var CGL_TRIANGLES = 3;
-var CGL_QUADS = 4;
-
-var CGL_2D_VERTEX_SHADER =
-[
-	'attribute vec2 a_position;',
-	'attribute vec4 a_texcoord;',
-	'attribute vec4 a_color;',
-
-	'varying vec2 v_texcoord;',
-	'varying vec4 v_color;',
-
-	'uniform mat4 u_projmat;',
-
-	'void main()',
-	'{',
-	'	gl_Position = u_projmat * vec4(a_position.x, a_position.y, 0, 1);',
-	'	v_texcoord = a_texcoord.st;',
-	'	v_color = a_color;',
-	'}'
-];
-
-var CGL_2D_FRAGMENT_SHADER =
-[
-	'precision mediump float;',
-
-	'varying vec2 v_texcoord;',
-	'varying vec4 v_color;',
-
-	'uniform sampler2D u_sampler;',
-
-	'void main()',
-	'{',
-	'	vec2 texcoord = vec2(v_texcoord.s, v_texcoord.t);',
-	'	vec4 color = texture2D(u_sampler, texcoord);',
-	'	color *= v_color;',
-	'	gl_FragColor = color;',
-	'}',
-];
-
-var cgl =
+window.CGL = (function(_cgl)
 {
-	c: null,
-	loc: { position: null, color: null, resolution: null, texcoord: null, sampler: null, projmat: null },
-	s: 1.0,
-	t: 1.0,
-	r: 1.0,
-	g: 1.0,
-	b: 1.0,
-	a: 1.0,
-	mat: [ new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]) ],
-	textures: {},
-	requested: 0,
-	loaded: 0,
-	texture: null,
-	texture_none: null,
-	program: null,
-	buffer: { vertex: null, texcoord: null, color: null },
-	data: { offset: 0, counter: 0, vertex: null, texcoord: null, color: null },
-	ready_callback: null,
-
-	create_shader: function(source, type)
+	_cgl = function()
 	{
-		var shader = this.c.createShader(type);
-		this.c.shaderSource(shader, source);
-		this.c.compileShader(shader);
+		var _cgl = this;
 
-		var compiled = this.c.getShaderParameter(shader, this.c.COMPILE_STATUS);
+		_cgl.context = null;
+		_cgl.loc = { position: null, color: null, resolution: null, texcoord: null, sampler: null, projmat: null };
+		_cgl.s = 1.0;
+		_cgl.t = 1.0;
+		_cgl.r = 1.0;
+		_cgl.g =  1.0;
+		_cgl.b = 1.0;
+		_cgl.a = 1.0;
+		_cgl.mat = [ new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]) ];
+		_cgl.textures = {};
+		_cgl.requested = 0;
+		_cgl.loaded = 0;
+		_cgl.texture = null;
+		_cgl.texture_none = null;
+		_cgl.program = null;
+		_cgl.buffer = { vertex: null, texcoord: null, color: null };
+		_cgl.data = { offset: 0, counter: 0, vertex: null, texcoord: null, color: null };
+		_cgl.ready_callback = null;
+
+		return _cgl;
+	};
+
+	_cgl.prototype.create_shader = function(source, type)
+	{
+		var cgl = this;
+
+		var shader = cgl.context.createShader(type);
+		cgl.context.shaderSource(shader, source);
+		cgl.context.compileShader(shader);
+
+		var compiled = cgl.context.getShaderParameter(shader, cgl.context.COMPILE_STATUS);
 
 		if ( ! compiled)
 		{
-			var error = this.c.getShaderInfoLog(shader);
+			var error = cgl.context.getShaderInfoLog(shader);
 
 			alert(error);
 			console.log(shader + ': ' + error);
 
-			this.c.deleteShader(shader);
+			cgl.context.deleteShader(shader);
 
 			return null;
 		}
 
 		return shader;
-	},
+	};
 
-	create_program: function(shaders, attributes, locations)
+	_cgl.prototype.create_program = function(shaders, attributes, locations)
 	{
-		var program = this.c.createProgram();
+		var cgl = this;
+
+		var program = cgl.context.createProgram();
 
 		for (var i = 0; i < shaders.length; i++)
 		{
-			this.c.attachShader(program, shaders[i]);
+			cgl.context.attachShader(program, shaders[i]);
 		}
 
 		if (attributes)
 		{
 			for (var i = 0; i < attributes.length; ++i)
 			{
-				this.c.bindAttribLocation(program, locations ? locations[i] : i, attributes[i]);
+				cgl.context.bindAttribLocation(program, locations ? locations[i] : i, attributes[i]);
 			}
 		}
 
-		this.c.linkProgram(program);
+		cgl.context.linkProgram(program);
 
-		var linked = this.c.getProgramParameter(program, this.c.LINK_STATUS);
+		var linked = cgl.context.getProgramParameter(program, cgl.context.LINK_STATUS);
 
 		if ( ! linked)
 		{
-			var error = this.c.getProgramInfoLog(program);
+			var error = cgl.context.getProgramInfoLog(program);
 
 			alert(error);
 			console.log(program + ': ' + error);
 
-			this.c.deleteProgram(program);
+			cgl.context.deleteProgram(program);
 
 			return null;
 		}
 
 		return program;
-	},
+	};
 
-	pow2: function(x)
+	_cgl.prototype.pow2 = function(x)
 	{
 		var logbase2 = Math.log(x) / Math.log(2);
 
 		return Math.round(Math.pow(2.0, parseInt(Math.ceil(logbase2))));
-	},
+	};
 
-	load_texture: function(url)
+	_cgl.prototype.load_texture = function(url)
 	{
-		if (typeof this.textures[url] != 'undefined')
+		var cgl = this;
+
+		if (typeof cgl.textures[url] != 'undefined')
 		{
-			return this.textures[url];
+			return cgl.textures[url];
 		}
 
-		this.requested++;
-		this.textures[url] = this.c.createTexture();
+		cgl.requested++;
+		cgl.textures[url] = cgl.context.createTexture();
 
 		var image = new Image();
 
@@ -178,29 +148,33 @@ var cgl =
 
 		image.src = url;
 
-		return this.textures[url];
-	},
+		return cgl.textures[url];
+	};
 
-	init_texture: function(image, texture)
+	_cgl.prototype.init_texture = function(image, texture)
 	{
-		this.c.bindTexture(this.c.TEXTURE_2D, texture);
-		this.c.texImage2D(this.c.TEXTURE_2D, 0, this.c.RGBA, this.c.RGBA, this.c.UNSIGNED_BYTE, image);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MAG_FILTER, this.c.NEAREST);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MIN_FILTER, this.c.NEAREST);
+		var cgl = this;
 
-		this.wrap_repeat();
+		cgl.context.bindTexture(cgl.context.TEXTURE_2D, texture);
+		cgl.context.texImage2D(cgl.context.TEXTURE_2D, 0, cgl.context.RGBA, cgl.context.RGBA, cgl.context.UNSIGNED_BYTE, image);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_MAG_FILTER, cgl.context.NEAREST);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_MIN_FILTER, cgl.context.NEAREST);
 
-		this.c.bindTexture(this.c.TEXTURE_2D, null);
-		this.loaded++;
+		cgl.wrap_repeat();
 
-		if (this.loaded >= this.requested)
+		cgl.context.bindTexture(cgl.context.TEXTURE_2D, null);
+		cgl.loaded++;
+
+		if (cgl.loaded >= cgl.requested)
 		{
-			this.ready_callback();
+			cgl.ready_callback();
 		}
-	},
+	};
 
-	setup: function(context, width, height, uw, vh)
+	_cgl.prototype.init = function(context)
 	{
+		var cgl = this;
+
 		if ( ! window.WebGLRenderingContext)
 		{
 			alert('No WebGL support');
@@ -208,9 +182,9 @@ var cgl =
 			return;
 		}
 
-		this.c = context;
+		cgl.context = context;
 
-		if ( ! this.c)
+		if ( ! cgl.context)
 		{
 			alert('Couldn\'t initialize WebGL context');
 
@@ -218,192 +192,254 @@ var cgl =
 		}
 
 		var data = new Uint8Array([ 255, 255, 255, 255 ]);
-		this.texture_none = this.c.createTexture();
-		this.c.bindTexture(this.c.TEXTURE_2D, this.texture_none);
-		this.c.texImage2D(this.c.TEXTURE_2D, 0, this.c.RGBA, 1, 1, 0, this.c.RGBA, this.c.UNSIGNED_BYTE, data);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MAG_FILTER, this.c.NEAREST);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MIN_FILTER, this.c.NEAREST);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_S, this.c.CLAMP_TO_EDGE);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_T, this.c.CLAMP_TO_EDGE);
+		cgl.texture_none = cgl.context.createTexture();
+		cgl.context.bindTexture(cgl.context.TEXTURE_2D, cgl.texture_none);
+		cgl.context.texImage2D(cgl.context.TEXTURE_2D, 0, cgl.context.RGBA, 1, 1, 0, cgl.context.RGBA, cgl.context.UNSIGNED_BYTE, data);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_MAG_FILTER, cgl.context.NEAREST);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_MIN_FILTER, cgl.context.NEAREST);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_WRAP_S, cgl.context.CLAMP_TO_EDGE);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_WRAP_T, cgl.context.CLAMP_TO_EDGE);
 
-		var vertex = this.create_shader(CGL_2D_VERTEX_SHADER.join("\n"), this.c.VERTEX_SHADER);
-		var fragment = this.create_shader(CGL_2D_FRAGMENT_SHADER.join("\n"), this.c.FRAGMENT_SHADER);
+		var vertex = cgl.create_shader
+		([
+			'attribute vec2 a_position;',
+			'attribute vec4 a_texcoord;',
+			'attribute vec4 a_color;',
 
-		this.program = this.create_program([vertex, fragment]);
+			'varying vec2 v_texcoord;',
+			'varying vec4 v_color;',
 
-		this.c.useProgram(this.program);
+			'uniform mat4 u_projmat;',
 
-		this.loc.position = this.c.getAttribLocation(this.program, 'a_position');
-		this.loc.color = this.c.getAttribLocation(this.program, 'a_color');
-		this.loc.texcoord = this.c.getAttribLocation(this.program, 'a_texcoord');
+			'void main()',
+			'{',
+			'	gl_Position = u_projmat * vec4(a_position.x, a_position.y, 0, 1);',
+			'	v_texcoord = a_texcoord.st;',
+			'	v_color = a_color;',
+			'}'
+		].join("\n"), cgl.context.VERTEX_SHADER);
 
-		this.c.enableVertexAttribArray(this.loc.position);
-		this.c.enableVertexAttribArray(this.loc.color);
-		this.c.enableVertexAttribArray(this.loc.texcoord);
+		var fragment = cgl.create_shader
+		([
+			'precision mediump float;',
 
-		this.loc.sampler = this.c.getUniformLocation(this.program, 'u_sampler');
+			'varying vec2 v_texcoord;',
+			'varying vec4 v_color;',
 
-		this.c.uniform1i(this.loc.sampler2d, 0);
-	},
+			'uniform sampler2D u_sampler;',
 
-	resize: function(width, height, uw, vh)
+			'void main()',
+			'{',
+			'	vec2 texcoord = vec2(v_texcoord.s, v_texcoord.t);',
+			'	vec4 color = texture2D(u_sampler, texcoord);',
+			'	color *= v_color;',
+			'	gl_FragColor = color;',
+			'}'
+		].join("\n"), cgl.context.FRAGMENT_SHADER);
+
+		cgl.program = cgl.create_program([vertex, fragment]);
+
+		cgl.context.useProgram(cgl.program);
+
+		cgl.loc.position = cgl.context.getAttribLocation(cgl.program, 'a_position');
+		cgl.loc.color = cgl.context.getAttribLocation(cgl.program, 'a_color');
+		cgl.loc.texcoord = cgl.context.getAttribLocation(cgl.program, 'a_texcoord');
+
+		cgl.context.enableVertexAttribArray(cgl.loc.position);
+		cgl.context.enableVertexAttribArray(cgl.loc.color);
+		cgl.context.enableVertexAttribArray(cgl.loc.texcoord);
+
+		cgl.loc.sampler = cgl.context.getUniformLocation(cgl.program, 'u_sampler');
+
+		cgl.context.uniform1i(cgl.loc.sampler2d, 0);
+	};
+
+	_cgl.prototype.resize = function(width, height, uw, vh)
 	{
-		this.viewport(0, 0, width, height);
-		this.scissor(0, 0, width, height);
+		var cgl = this;
 
-		this.load_identity();
-		this.ortho(0, uw, vh, 0, -100, 100);
-	},
+		cgl.viewport(0, 0, width, height);
+		cgl.scissor(0, 0, width, height);
 
-	clear: function()
+		cgl.load_identity();
+		cgl.ortho(0, uw, vh, 0, -100, 100);
+	};
+
+	_cgl.prototype.clear = function()
 	{
-		this.c.clear(this.c.COLOR_BUFFER_BIT);
-	},
+		var cgl = this;
 
-	clear_color: function(r, g, b, a)
+		cgl.context.clear(cgl.context.COLOR_BUFFER_BIT);
+	};
+
+	_cgl.prototype.clear_color = function(r, g, b, a)
 	{
-		this.c.clearColor(r, g, b, a || 1.0);
-	},
+		var cgl = this;
 
-	viewport: function(x, y, width, height)
+		cgl.context.clearColor(r, g, b, a || 1.0);
+	};
+
+	_cgl.prototype.viewport = function(x, y, width, height)
 	{
-		this.c.viewport(x, y, width, height);
-	},
+		var cgl = this;
 
-	scissor: function(x, y, width, height)
+		cgl.context.viewport(x, y, width, height);
+	};
+
+	_cgl.prototype.scissor = function(x, y, width, height)
 	{
-		this.c.scissor(x, y, width, height)
-	},
+		var cgl = this;
 
-	begin: function(primitive)
+		cgl.context.scissor(x, y, width, height)
+	};
+
+	_cgl.prototype.begin = function(primitive)
 	{
-		this.primitive = primitive;
+		var cgl = this;
 
-		this.data.vertex = new Float32Array(CGL_VERTEX_BUFFER_SIZE * 2);
-		this.data.texcoord = new Float32Array(CGL_VERTEX_BUFFER_SIZE * 2);
-		this.data.color = new Float32Array(CGL_VERTEX_BUFFER_SIZE * 4);
+		cgl.primitive = primitive;
 
-		if (this.buffer.vertex == null)
+		cgl.data.vertex = new Float32Array(_cgl.VERTEX_BUFFER_SIZE * 2);
+		cgl.data.texcoord = new Float32Array(_cgl.VERTEX_BUFFER_SIZE * 2);
+		cgl.data.color = new Float32Array(_cgl.VERTEX_BUFFER_SIZE * 4);
+
+		if (cgl.buffer.vertex == null)
 		{
-			this.buffer.vertex = this.c.createBuffer();
-			this.c.bindBuffer(this.c.ARRAY_BUFFER, this.buffer.vertex);
-			this.c.bufferData(this.c.ARRAY_BUFFER, CGL_VERTEX_BUFFER_SIZE * 2 * Float32Array.BYTES_PER_ELEMENT, this.c.STREAM_DRAW);
+			cgl.buffer.vertex = cgl.context.createBuffer();
+			cgl.context.bindBuffer(cgl.context.ARRAY_BUFFER, cgl.buffer.vertex);
+			cgl.context.bufferData(cgl.context.ARRAY_BUFFER, _cgl.VERTEX_BUFFER_SIZE * 2 * Float32Array.BYTES_PER_ELEMENT, cgl.context.STREAM_DRAW);
 		}
 
-		if (this.buffer.texcoord == null)
+		if (cgl.buffer.texcoord == null)
 		{
-			this.buffer.texcoord = this.c.createBuffer();
-			this.c.bindBuffer(this.c.ARRAY_BUFFER, this.buffer.texcoord);
-			this.c.bufferData(this.c.ARRAY_BUFFER, CGL_VERTEX_BUFFER_SIZE * 2 * Float32Array.BYTES_PER_ELEMENT, this.c.STREAM_DRAW);
+			cgl.buffer.texcoord = cgl.context.createBuffer();
+			cgl.context.bindBuffer(cgl.context.ARRAY_BUFFER, cgl.buffer.texcoord);
+			cgl.context.bufferData(cgl.context.ARRAY_BUFFER, _cgl.VERTEX_BUFFER_SIZE * 2 * Float32Array.BYTES_PER_ELEMENT, cgl.context.STREAM_DRAW);
 		}
 
-		if (this.buffer.color == null)
+		if (cgl.buffer.color == null)
 		{
-			this.buffer.color = this.c.createBuffer();
-			this.c.bindBuffer(this.c.ARRAY_BUFFER, this.buffer.color);
-			this.c.bufferData(this.c.ARRAY_BUFFER, CGL_VERTEX_BUFFER_SIZE * 4 * Float32Array.BYTES_PER_ELEMENT, this.c.STREAM_DRAW);
+			cgl.buffer.color = cgl.context.createBuffer();
+			cgl.context.bindBuffer(cgl.context.ARRAY_BUFFER, cgl.buffer.color);
+			cgl.context.bufferData(cgl.context.ARRAY_BUFFER, _cgl.VERTEX_BUFFER_SIZE * 4 * Float32Array.BYTES_PER_ELEMENT, cgl.context.STREAM_DRAW);
 		}
 
-		this.loc.projmat = this.c.getUniformLocation(this.program, 'u_projmat');
-		this.c.uniformMatrix4fv(this.loc.projmat, this.c.FALSE, this.mat[this.mat.length - 1]);
-	},
+		cgl.loc.projmat = cgl.context.getUniformLocation(cgl.program, 'u_projmat');
+		cgl.context.uniformMatrix4fv(cgl.loc.projmat, cgl.context.FALSE, cgl.mat[cgl.mat.length - 1]);
+	};
 
-	end: function()
+	_cgl.prototype.end = function()
 	{
-		if (this.data.offset == 0)
+		var cgl = this;
+
+		if (cgl.data.offset == 0)
 		{
 			return;
 		}
 
 		var primitive = null;
 
-		switch (this.primitive)
+		switch (cgl.primitive)
 		{
-			case CGL_POINTS:
-				primitive = this.c.POINTS;
+			case _cgl.POINTS:
+				primitive = cgl.context.POINTS;
 			break;
 
-			case CGL_LINES:
-				primitive = this.c.LINES;
+			case _cgl.LINES:
+				primitive = cgl.context.LINES;
 			break;
 
-			case CGL_TRIANGLES:
-			case CGL_QUADS:
-				primitive = this.c.TRIANGLES;
+			case _cgl.TRIANGLES:
+			case _cgl.QUADS:
+				primitive = cgl.context.TRIANGLES;
 			break;
 		}
 
-		this.c.bindBuffer(this.c.ARRAY_BUFFER, this.buffer.vertex);
-		this.c.bufferSubData(this.c.ARRAY_BUFFER, 0, this.data.vertex);
-		this.c.vertexAttribPointer(this.loc.position, 2, this.c.FLOAT, false, 0, 0);
-		this.c.enableVertexAttribArray(this.loc.position);
+		cgl.context.bindBuffer(cgl.context.ARRAY_BUFFER, cgl.buffer.vertex);
+		cgl.context.bufferSubData(cgl.context.ARRAY_BUFFER, 0, cgl.data.vertex);
+		cgl.context.vertexAttribPointer(cgl.loc.position, 2, cgl.context.FLOAT, false, 0, 0);
+		cgl.context.enableVertexAttribArray(cgl.loc.position);
 
-		this.c.bindBuffer(this.c.ARRAY_BUFFER, this.buffer.texcoord);
-		this.c.bufferSubData(this.c.ARRAY_BUFFER, 0, this.data.texcoord);
-		this.c.vertexAttribPointer(this.loc.texcoord, 2, this.c.FLOAT, false, 0, 0);
-		this.c.enableVertexAttribArray(this.loc.texcoord);
+		cgl.context.bindBuffer(cgl.context.ARRAY_BUFFER, cgl.buffer.texcoord);
+		cgl.context.bufferSubData(cgl.context.ARRAY_BUFFER, 0, cgl.data.texcoord);
+		cgl.context.vertexAttribPointer(cgl.loc.texcoord, 2, cgl.context.FLOAT, false, 0, 0);
+		cgl.context.enableVertexAttribArray(cgl.loc.texcoord);
 
-		this.c.bindBuffer(this.c.ARRAY_BUFFER, this.buffer.color);
-		this.c.bufferSubData(this.c.ARRAY_BUFFER, 0, this.data.color);
-		this.c.vertexAttribPointer(this.loc.color, 4, this.c.FLOAT, false, 0, 0);
-		this.c.enableVertexAttribArray(this.loc.color);
+		cgl.context.bindBuffer(cgl.context.ARRAY_BUFFER, cgl.buffer.color);
+		cgl.context.bufferSubData(cgl.context.ARRAY_BUFFER, 0, cgl.data.color);
+		cgl.context.vertexAttribPointer(cgl.loc.color, 4, cgl.context.FLOAT, false, 0, 0);
+		cgl.context.enableVertexAttribArray(cgl.loc.color);
 
-		this.c.bindTexture(this.c.TEXTURE_2D, this.texture);
+		cgl.context.bindTexture(cgl.context.TEXTURE_2D, cgl.texture);
 
-		this.c.drawArrays(primitive, 0, this.data.offset);
+		cgl.context.drawArrays(primitive, 0, cgl.data.offset);
 
-		this.c.disableVertexAttribArray(this.loc.vertex);
-		this.c.disableVertexAttribArray(this.loc.texcoord);
-		this.c.disableVertexAttribArray(this.loc.color);
+		cgl.context.disableVertexAttribArray(cgl.loc.vertex);
+		cgl.context.disableVertexAttribArray(cgl.loc.texcoord);
+		cgl.context.disableVertexAttribArray(cgl.loc.color);
 
-		this.data.offset = 0;
-		this.data.counter = 0;
-	},
+		cgl.data.offset = 0;
+		cgl.data.counter = 0;
+	};
 
-	__set_vertex: function(offset, x, y)
+	_cgl.prototype.__set_vertex = function(offset, x, y)
 	{
-		this.data.vertex[(offset * 2) + 0] = x;
-		this.data.vertex[(offset * 2) + 1] = y;
-	},
+		var cgl = this;
 
-	__get_vertex: function(offset)
+		cgl.data.vertex[(offset * 2) + 0] = x;
+		cgl.data.vertex[(offset * 2) + 1] = y;
+	};
+
+	_cgl.prototype.__get_vertex = function(offset)
 	{
-		return { x: this.data.vertex[(offset * 2) + 0], y: this.data.vertex[(offset * 2) + 1] };
-	},
+		var cgl = this;
 
-	__set_texcoord: function(offset, s, t)
+		return { x: cgl.data.vertex[(offset * 2) + 0], y: cgl.data.vertex[(offset * 2) + 1] };
+	};
+
+	_cgl.prototype.__set_texcoord = function(offset, s, t)
 	{
-		this.data.texcoord[(offset * 2) + 0] = s;
-		this.data.texcoord[(offset * 2) + 1] = t;
-	},
+		var cgl = this;
 
-	__get_texcoord: function(offset)
+		cgl.data.texcoord[(offset * 2) + 0] = s;
+		cgl.data.texcoord[(offset * 2) + 1] = t;
+	};
+
+	_cgl.prototype.__get_texcoord = function(offset)
 	{
-		return { s: this.data.texcoord[(offset * 2) + 0], t: this.data.texcoord[(offset * 2) + 1] };
-	},
+		var cgl = this;
 
-	__set_color: function(offset, r, g, b, a)
+		return { s: cgl.data.texcoord[(offset * 2) + 0], t: cgl.data.texcoord[(offset * 2) + 1] };
+	};
+
+	_cgl.prototype.__set_color = function(offset, r, g, b, a)
 	{
-		this.data.color[(offset * 4) + 0] = r;
-		this.data.color[(offset * 4) + 1] = g;
-		this.data.color[(offset * 4) + 2] = b;
-		this.data.color[(offset * 4) + 3] = a;
-	},
+		var cgl = this;
 
-	__get_color: function(offset)
+		cgl.data.color[(offset * 4) + 0] = r;
+		cgl.data.color[(offset * 4) + 1] = g;
+		cgl.data.color[(offset * 4) + 2] = b;
+		cgl.data.color[(offset * 4) + 3] = a;
+	};
+
+	_cgl.prototype.__get_color = function(offset)
 	{
-		return { r: this.data.color[(offset * 4) + 0], g: this.data.color[(offset * 4) + 1], b: this.data.color[(offset * 4) + 2], a: this.data.color[(offset * 4) + 3] };
-	},
+		var cgl = this;
 
-	vertex: function(x, y)
+		return { r: cgl.data.color[(offset * 4) + 0], g: cgl.data.color[(offset * 4) + 1], b: cgl.data.color[(offset * 4) + 2], a: cgl.data.color[(offset * 4) + 3] };
+	};
+
+	_cgl.prototype.vertex = function(x, y)
 	{
-		this.__set_vertex(this.data.offset, x, y);
-		this.__set_texcoord(this.data.offset, this.s, this.t);
-		this.__set_color(this.data.offset, this.r, this.g, this.b, this.a);
+		var cgl = this;
 
-		this.data.counter++;
+		cgl.__set_vertex(cgl.data.offset, x, y);
+		cgl.__set_texcoord(cgl.data.offset, cgl.s, cgl.t);
+		cgl.__set_color(cgl.data.offset, cgl.r, cgl.g, cgl.b, cgl.a);
 
-		if (this.primitive == CGL_QUADS && this.data.counter == 4)
+		cgl.data.counter++;
+
+		if (cgl.primitive == _cgl.QUADS && cgl.data.counter == 4)
 		{
 			var vertex = [];
 			var texcoord = [];
@@ -411,145 +447,165 @@ var cgl =
 
 			for (var i = 0; i < 4; i++)
 			{
-				vertex.unshift(this.__get_vertex(this.data.offset - i));
-				texcoord.unshift(this.__get_texcoord(this.data.offset - i));
-				color.unshift(this.__get_color(this.data.offset - i));
+				vertex.unshift(cgl.__get_vertex(cgl.data.offset - i));
+				texcoord.unshift(cgl.__get_texcoord(cgl.data.offset - i));
+				color.unshift(cgl.__get_color(cgl.data.offset - i));
 			}
 
-			this.__set_vertex(this.data.offset - 1, vertex[3].x, vertex[3].y);
-			this.__set_texcoord(this.data.offset - 1, texcoord[3].s, texcoord[3].t);
-			this.__set_color(this.data.offset - 1, color[3].r, color[3].g, color[3].b, color[3].a);
+			cgl.__set_vertex(cgl.data.offset - 1, vertex[3].x, vertex[3].y);
+			cgl.__set_texcoord(cgl.data.offset - 1, texcoord[3].s, texcoord[3].t);
+			cgl.__set_color(cgl.data.offset - 1, color[3].r, color[3].g, color[3].b, color[3].a);
 
-			this.data.offset++;
+			cgl.data.offset++;
 
-			this.__set_vertex(this.data.offset, vertex[1].x, vertex[1].y);
-			this.__set_texcoord(this.data.offset, texcoord[1].s, texcoord[1].t);
-			this.__set_color(this.data.offset, color[1].r, color[1].g, color[1].b, color[1].a);
+			cgl.__set_vertex(cgl.data.offset, vertex[1].x, vertex[1].y);
+			cgl.__set_texcoord(cgl.data.offset, texcoord[1].s, texcoord[1].t);
+			cgl.__set_color(cgl.data.offset, color[1].r, color[1].g, color[1].b, color[1].a);
 
-			this.data.offset++;
+			cgl.data.offset++;
 
-			this.__set_vertex(this.data.offset, vertex[2].x, vertex[2].y);
-			this.__set_texcoord(this.data.offset, texcoord[2].s, texcoord[2].t);
-			this.__set_color(this.data.offset, color[2].r, color[2].g, color[2].b, color[2].a);
+			cgl.__set_vertex(cgl.data.offset, vertex[2].x, vertex[2].y);
+			cgl.__set_texcoord(cgl.data.offset, texcoord[2].s, texcoord[2].t);
+			cgl.__set_color(cgl.data.offset, color[2].r, color[2].g, color[2].b, color[2].a);
 
-			this.data.counter = 0;
+			cgl.data.counter = 0;
 		}
 
-		this.data.offset++;
+		cgl.data.offset++;
 
-		if (this.data.offset >= CGL_VERTEX_BUFFER_SIZE)
+		if (cgl.data.offset >= _cgl.VERTEX_BUFFER_SIZE)
 		{
-			this.end();
+			cgl.end();
 		}
-	},
+	};
 
-	texcoord: function(s, t)
+	_cgl.prototype.texcoord = function(s, t)
 	{
-		this.s = s;
-		this.t = t;
-	},
+		var cgl = this;
 
-	color: function(r, g, b, a)
+		cgl.s = s;
+		cgl.t = t;
+	};
+
+	_cgl.prototype.color = function(r, g, b, a)
 	{
-		this.r = r;
-		this.g = g;
-		this.b = b;
-		this.a = a || 1.0;
-	},
+		var cgl = this;
 
-	bind: function(texture)
+		cgl.r = r;
+		cgl.g = g;
+		cgl.b = b;
+		cgl.a = a || 1.0;
+	};
+
+	_cgl.prototype.bind = function(texture)
 	{
-		this.texture = texture;
+		var cgl = this;
 
-		this.c.bindTexture(this.c.TEXTURE_2D, this.texture);
+		cgl.texture = texture;
+
+		cgl.context.bindTexture(cgl.context.TEXTURE_2D, cgl.texture);
 
 		if ( ! texture)
 		{
-			this.unbind();
+			cgl.unbind();
 		}
-	},
+	};
 
-	unbind: function()
+	_cgl.prototype.unbind = function()
 	{
-		this.texture = this.texture_none;
+		var cgl = this;
 
-		this.c.bindTexture(this.c.TEXTURE_2D, this.texture);
-	},
+		cgl.texture = cgl.texture_none;
 
-	push_matrix: function()
+		cgl.context.bindTexture(cgl.context.TEXTURE_2D, cgl.texture);
+	};
+
+	_cgl.prototype.push_matrix = function()
 	{
-		var m = this.mat.length - 1;
+		var cgl = this;
 
-		this.mat.push(new Float32Array(16));
+		var m = cgl.mat.length - 1;
 
-		this.mat[m + 1][0] = this.mat[m][0]; this.mat[m + 1][1] = this.mat[m][1]; this.mat[m + 1][2] = this.mat[m][2]; this.mat[m + 1][3] = this.mat[m][3];
-		this.mat[m + 1][4] = this.mat[m][4]; this.mat[m + 1][5] = this.mat[m][5]; this.mat[m + 1][6] = this.mat[m][6]; this.mat[m + 1][7] = this.mat[m][7];
-		this.mat[m + 1][8] = this.mat[m][8]; this.mat[m + 1][9] = this.mat[m][9]; this.mat[m + 1][10] = this.mat[m][10]; this.mat[m + 1][11] = this.mat[m][11];
-		this.mat[m + 1][12] = this.mat[m][12]; this.mat[m + 1][13] = this.mat[m][13]; this.mat[m + 1][14] = this.mat[m][14]; this.mat[m + 1][15] = this.mat[m][15];
-	},
+		cgl.mat.push(new Float32Array(16));
 
-	pop_matrix: function()
+		cgl.mat[m + 1][0] = cgl.mat[m][0]; cgl.mat[m + 1][1] = cgl.mat[m][1]; cgl.mat[m + 1][2] = cgl.mat[m][2]; cgl.mat[m + 1][3] = cgl.mat[m][3];
+		cgl.mat[m + 1][4] = cgl.mat[m][4]; cgl.mat[m + 1][5] = cgl.mat[m][5]; cgl.mat[m + 1][6] = cgl.mat[m][6]; cgl.mat[m + 1][7] = cgl.mat[m][7];
+		cgl.mat[m + 1][8] = cgl.mat[m][8]; cgl.mat[m + 1][9] = cgl.mat[m][9]; cgl.mat[m + 1][10] = cgl.mat[m][10]; cgl.mat[m + 1][11] = cgl.mat[m][11];
+		cgl.mat[m + 1][12] = cgl.mat[m][12]; cgl.mat[m + 1][13] = cgl.mat[m][13]; cgl.mat[m + 1][14] = cgl.mat[m][14]; cgl.mat[m + 1][15] = cgl.mat[m][15];
+	};
+
+	_cgl.prototype.pop_matrix = function()
 	{
-		if (this.mat.length <= 1)
+		var cgl = this;
+
+		if (cgl.mat.length <= 1)
 		{
 			return;
 		}
 
-		this.mat.pop();
-	},
+		cgl.mat.pop();
+	};
 
-	load_identity: function()
+	_cgl.prototype.load_identity = function()
 	{
-		var m = this.mat.length - 1;
+		var cgl = this;
 
-		this.mat[m][0] = this.mat[m][5] = this.mat[m][10] = this.mat[m][15] = 1.0;
-		this.mat[m][1] = this.mat[m][2] = this.mat[m][3] = this.mat[m][4] = this.mat[m][6] = this.mat[m][7] = 0.0;
-		this.mat[m][8] = this.mat[m][9] = this.mat[m][11] = this.mat[m][12] = this.mat[m][13] = this.mat[m][14] = 0.0;
-	},
+		var m = cgl.mat.length - 1;
 
-	load_matrix: function(mat)
+		cgl.mat[m][0] = cgl.mat[m][5] = cgl.mat[m][10] = cgl.mat[m][15] = 1.0;
+		cgl.mat[m][1] = cgl.mat[m][2] = cgl.mat[m][3] = cgl.mat[m][4] = cgl.mat[m][6] = cgl.mat[m][7] = 0.0;
+		cgl.mat[m][8] = cgl.mat[m][9] = cgl.mat[m][11] = cgl.mat[m][12] = cgl.mat[m][13] = cgl.mat[m][14] = 0.0;
+	};
+
+	_cgl.prototype.load_matrix = function(mat)
 	{
-		var m = this.mat.length - 1;
+		var cgl = this;
 
-		this.mat[m][0] = mat[0]; this.mat[m][1] = mat[1]; this.mat[m][2] = mat[2]; this.mat[m][3] = mat[3];
-		this.mat[m][4] = mat[4]; this.mat[m][5] = mat[5]; this.mat[m][6] = mat[6]; this.mat[m][7] = mat[7];
-		this.mat[m][8] = mat[8]; this.mat[m][9] = mat[9]; this.mat[m][10] = mat[10]; this.mat[m][11] = mat[11];
-		this.mat[m][12] = mat[12]; this.mat[m][13] = mat[13]; this.mat[m][14] = mat[14]; this.mat[m][15] = mat[15];
-	},
+		var m = cgl.mat.length - 1;
 
-	mult_matrix: function(mat)
+		cgl.mat[m][0] = mat[0]; cgl.mat[m][1] = mat[1]; cgl.mat[m][2] = mat[2]; cgl.mat[m][3] = mat[3];
+		cgl.mat[m][4] = mat[4]; cgl.mat[m][5] = mat[5]; cgl.mat[m][6] = mat[6]; cgl.mat[m][7] = mat[7];
+		cgl.mat[m][8] = mat[8]; cgl.mat[m][9] = mat[9]; cgl.mat[m][10] = mat[10]; cgl.mat[m][11] = mat[11];
+		cgl.mat[m][12] = mat[12]; cgl.mat[m][13] = mat[13]; cgl.mat[m][14] = mat[14]; cgl.mat[m][15] = mat[15];
+	};
+
+	_cgl.prototype.mult_matrix = function(mat)
 	{
-		var m = this.mat.length - 1;
+		var cgl = this;
 
-		var a00 = this.mat[m][0], a01 = this.mat[m][1], a02 = this.mat[m][2], a03 = this.mat[m][3];
-		var a10 = this.mat[m][4], a11 = this.mat[m][5], a12 = this.mat[m][6], a13 = this.mat[m][7];
-		var a20 = this.mat[m][8], a21 = this.mat[m][9], a22 = this.mat[m][10], a23 = this.mat[m][11];
-		var a30 = this.mat[m][12], a31 = this.mat[m][13], a32 = this.mat[m][14], a33 = this.mat[m][15];
+		var m = cgl.mat.length - 1;
+
+		var a00 = cgl.mat[m][0], a01 = cgl.mat[m][1], a02 = cgl.mat[m][2], a03 = cgl.mat[m][3];
+		var a10 = cgl.mat[m][4], a11 = cgl.mat[m][5], a12 = cgl.mat[m][6], a13 = cgl.mat[m][7];
+		var a20 = cgl.mat[m][8], a21 = cgl.mat[m][9], a22 = cgl.mat[m][10], a23 = cgl.mat[m][11];
+		var a30 = cgl.mat[m][12], a31 = cgl.mat[m][13], a32 = cgl.mat[m][14], a33 = cgl.mat[m][15];
 		var b00 = mat[0], b01 = mat[1], b02 = mat[2], b03 = mat[3];
 		var b10 = mat[4], b11 = mat[5], b12 = mat[6], b13 = mat[7];
 		var b20 = mat[8], b21 = mat[9], b22 = mat[10], b23 = mat[11];
 		var b30 = mat[12], b31 = mat[13], b32 = mat[14], b33 = mat[15];
 
-		this.mat[m][0] = b00 * a00 + b01 * a10 + b02 * a20 + b03 * a30;
-		this.mat[m][1] = b00 * a01 + b01 * a11 + b02 * a21 + b03 * a31;
-		this.mat[m][2] = b00 * a02 + b01 * a12 + b02 * a22 + b03 * a32;
-		this.mat[m][3] = b00 * a03 + b01 * a13 + b02 * a23 + b03 * a33;
-		this.mat[m][4] = b10 * a00 + b11 * a10 + b12 * a20 + b13 * a30;
-		this.mat[m][5] = b10 * a01 + b11 * a11 + b12 * a21 + b13 * a31;
-		this.mat[m][6] = b10 * a02 + b11 * a12 + b12 * a22 + b13 * a32;
-		this.mat[m][7] = b10 * a03 + b11 * a13 + b12 * a23 + b13 * a33;
-		this.mat[m][8] = b20 * a00 + b21 * a10 + b22 * a20 + b23 * a30;
-		this.mat[m][9] = b20 * a01 + b21 * a11 + b22 * a21 + b23 * a31;
-		this.mat[m][10] = b20 * a02 + b21 * a12 + b22 * a22 + b23 * a32;
-		this.mat[m][11] = b20 * a03 + b21 * a13 + b22 * a23 + b23 * a33;
-		this.mat[m][12] = b30 * a00 + b31 * a10 + b32 * a20 + b33 * a30;
-		this.mat[m][13] = b30 * a01 + b31 * a11 + b32 * a21 + b33 * a31;
-		this.mat[m][14] = b30 * a02 + b31 * a12 + b32 * a22 + b33 * a32;
-		this.mat[m][15] = b30 * a03 + b31 * a13 + b32 * a23 + b33 * a33;
-	},
+		cgl.mat[m][0] = b00 * a00 + b01 * a10 + b02 * a20 + b03 * a30;
+		cgl.mat[m][1] = b00 * a01 + b01 * a11 + b02 * a21 + b03 * a31;
+		cgl.mat[m][2] = b00 * a02 + b01 * a12 + b02 * a22 + b03 * a32;
+		cgl.mat[m][3] = b00 * a03 + b01 * a13 + b02 * a23 + b03 * a33;
+		cgl.mat[m][4] = b10 * a00 + b11 * a10 + b12 * a20 + b13 * a30;
+		cgl.mat[m][5] = b10 * a01 + b11 * a11 + b12 * a21 + b13 * a31;
+		cgl.mat[m][6] = b10 * a02 + b11 * a12 + b12 * a22 + b13 * a32;
+		cgl.mat[m][7] = b10 * a03 + b11 * a13 + b12 * a23 + b13 * a33;
+		cgl.mat[m][8] = b20 * a00 + b21 * a10 + b22 * a20 + b23 * a30;
+		cgl.mat[m][9] = b20 * a01 + b21 * a11 + b22 * a21 + b23 * a31;
+		cgl.mat[m][10] = b20 * a02 + b21 * a12 + b22 * a22 + b23 * a32;
+		cgl.mat[m][11] = b20 * a03 + b21 * a13 + b22 * a23 + b23 * a33;
+		cgl.mat[m][12] = b30 * a00 + b31 * a10 + b32 * a20 + b33 * a30;
+		cgl.mat[m][13] = b30 * a01 + b31 * a11 + b32 * a21 + b33 * a31;
+		cgl.mat[m][14] = b30 * a02 + b31 * a12 + b32 * a22 + b33 * a32;
+		cgl.mat[m][15] = b30 * a03 + b31 * a13 + b32 * a23 + b33 * a33;
+	};
 
-	translate: function(x, y, z)
+	_cgl.prototype.translate = function(x, y, z)
 	{
+		var cgl = this;
+
 		var mat = new Float32Array(16);
 
 		mat[0] = mat[5] = mat[10] = mat[15] = 1.0;
@@ -558,11 +614,13 @@ var cgl =
 		mat[13] = y || 0.0;
 		mat[14] = z || 0.0;
 
-		this.mult_matrix(mat);
-	},
+		cgl.mult_matrix(mat);
+	};
 
-	rotate: function(angle, x, y, z)
+	_cgl.prototype.rotate = function(angle, x, y, z)
 	{
+		var cgl = this;
+
 		angle = Math.PI * angle / 180.0;
 		var mat = new Float32Array(16);
 
@@ -586,11 +644,13 @@ var cgl =
 		mat[3] = mat[7] = mat[11] = mat[12] = mat[13] = mat[14] = 0.0;
 		mat[15] = 1.0;
 
-		this.mult_matrix(mat);
-	},
+		cgl.mult_matrix(mat);
+	};
 
-	scale: function(x, y, z)
+	_cgl.prototype.scale = function(x, y, z)
 	{
+		var cgl = this;
+
 		var mat = new Float32Array(16);
 
 		mat[0] = x || 1.0;
@@ -600,11 +660,13 @@ var cgl =
 		mat[1] = mat[2] = mat[3] = mat[4] = mat[6] = mat[7] = 0.0;
 		mat[8] = mat[9] = mat[11] = mat[12] = mat[13] = mat[14] = 0.0;
 
-		this.mult_matrix(mat);
-	},
+		cgl.mult_matrix(mat);
+	};
 
-	ortho: function(left, right, bottom, top, near, far)
+	_cgl.prototype.ortho = function(left, right, bottom, top, near, far)
 	{
+		var cgl = this;
+
 		var dx = right - left;
 		var dy = top - bottom;
 		var dz = far - near;
@@ -627,77 +689,101 @@ var cgl =
 		mat[15] = 1.0;
 		mat[1] = mat[2] = mat[3] = mat[4] = mat[6] = mat[7] = mat[8] = mat[9] = 0.0;
 
-		this.mult_matrix(mat);
-	},
+		cgl.mult_matrix(mat);
+	};
 
-	blend_alpha: function()
+	_cgl.prototype.blend_alpha = function()
 	{
-		this.c.enable(this.c.BLEND);
-		this.c.blendFunc(this.c.SRC_ALPHA, this.c.ONE_MINUS_SRC_ALPHA);
-	},
+		var cgl = this;
 
-	blend_add: function()
-	{
-		this.c.enable(this.c.BLEND);
-		this.c.blendFunc(this.c.SRC_ALPHA, this.c.ONE);
-	},
+		cgl.context.enable(cgl.context.BLEND);
+		cgl.context.blendFunc(cgl.context.SRC_ALPHA, cgl.context.ONE_MINUS_SRC_ALPHA);
+	};
 
-	blend_multiply: function()
+	_cgl.prototype.blend_add = function()
 	{
-		this.c.enable(this.c.BLEND);
-		this.c.blendFunc(this.c.ZERO, this.c.SRC_COLOR);
-	},
+		var cgl = this;
 
-	blend_dodge: function()
-	{
-		this.c.enable(this.c.BLEND);
-		this.c.blendFunc(this.c.DST_COLOR, this.c.ONE);
-	},
+		cgl.context.enable(cgl.context.BLEND);
+		cgl.context.blendFunc(cgl.context.SRC_ALPHA, cgl.context.ONE);
+	};
 
-	depth_enable: function(depth_mask)
+	_cgl.prototype.blend_multiply = function()
 	{
-		this.c.depthMask(depth_mask || false);
-		this.c.enable(this.c.DEPTH_TEST);
-	},
+		var cgl = this;
 
-	depth_disable: function(depth_mask)
-	{
-		this.c.disable(this.c.DEPTH_TEST);
-		this.c.depthMask(depth_mask || false);
-	},
+		cgl.context.enable(cgl.context.BLEND);
+		cgl.context.blendFunc(cgl.context.ZERO, cgl.context.SRC_COLOR);
+	};
 
-	filter_nearest: function()
+	_cgl.prototype.blend_dodge = function()
 	{
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MAG_FILTER, this.c.NEAREST);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MIN_FILTER, this.c.NEAREST);
-	},
+		var cgl = this;
 
-	filter_linear: function()
-	{
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MAG_FILTER, this.c.LINEAR);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_MIN_FILTER, this.c.LINEAR);
-	},
+		cgl.context.enable(cgl.context.BLEND);
+		cgl.context.blendFunc(cgl.context.DST_COLOR, cgl.context.ONE);
+	};
 
-	wrap_clamp: function()
+	_cgl.prototype.depth_enable = function(depth_mask)
 	{
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_S, this.c.CLAMP);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_T, this.c.CLAMP);
-	},
+		var cgl = this;
 
-	wrap_clamp_to_edge: function()
-	{
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_S, this.c.CLAMP_TO_EDGE);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_T, this.c.CLAMP_TO_EDGE);
-	},
+		cgl.context.depthMask(depth_mask || false);
+		cgl.context.enable(cgl.context.DEPTH_TEST);
+	};
 
-	wrap_repeat: function()
+	_cgl.prototype.depth_disable = function(depth_mask)
 	{
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_S, this.c.REPEAT);
-		this.c.texParameteri(this.c.TEXTURE_2D, this.c.TEXTURE_WRAP_T, this.c.REPEAT);
-	},
+		var cgl = this;
 
-	sprite: function(x, y, s)
+		cgl.context.disable(cgl.context.DEPTH_TEST);
+		cgl.context.depthMask(depth_mask || false);
+	};
+
+	_cgl.prototype.filter_nearest = function()
 	{
+		var cgl = this;
+
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_MAG_FILTER, cgl.context.NEAREST);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_MIN_FILTER, cgl.context.NEAREST);
+	};
+
+	_cgl.prototype.filter_linear = function()
+	{
+		var cgl = this;
+
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_MAG_FILTER, cgl.context.LINEAR);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_MIN_FILTER, cgl.context.LINEAR);
+	};
+
+	_cgl.prototype.wrap_clamp = function()
+	{
+		var cgl = this;
+
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_WRAP_S, cgl.context.CLAMP);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_WRAP_T, cgl.context.CLAMP);
+	};
+
+	_cgl.prototype.wrap_clamp_to_edge = function()
+	{
+		var cgl = this;
+
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_WRAP_S, cgl.context.CLAMP_TO_EDGE);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_WRAP_T, cgl.context.CLAMP_TO_EDGE);
+	};
+
+	_cgl.prototype.wrap_repeat = function()
+	{
+		var cgl = this;
+
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_WRAP_S, cgl.context.REPEAT);
+		cgl.context.texParameteri(cgl.context.TEXTURE_2D, cgl.context.TEXTURE_WRAP_T, cgl.context.REPEAT);
+	};
+
+	_cgl.prototype.sprite = function(x, y, s)
+	{
+		var cgl = this;
+
 		var def =
 		{
 			width: 64,
@@ -824,10 +910,12 @@ var cgl =
 			cgl.texcoord(texcoords[i][0], texcoords[i][1]);
 			cgl.vertex(x + vertices[i][0], y + vertices[i][1]);
 		}
-	},
+	};
 
-	write: function(x, y, text, width, height, align, render, hs, vs)
+	_cgl.prototype.write = function(x, y, text, width, height, align, render, hs, vs)
 	{
+		var cgl = this;
+
 		if (typeof text != 'string')
 		{
 			text += '';
@@ -857,7 +945,7 @@ var cgl =
 
 		cgl.blend_alpha();
 
-		cgl.begin(CGL_QUADS);
+		cgl.begin(_cgl.QUADS);
 
 		for (var i = 0; i < len; i++)
 		{
@@ -890,15 +978,25 @@ var cgl =
 		{
 			cgl.end();
 		}
-	},
+	};
 
-	ready: function(callback)
+	_cgl.prototype.ready = function(callback)
 	{
-		this.ready_callback = callback || function() {};
+		var cgl = this;
 
-		if (this.requested == 0)
+		cgl.ready_callback = callback || function() {};
+
+		if (cgl.requested == 0)
 		{
-			this.ready_callback();
+			cgl.ready_callback();
 		}
-	}
-};
+	};
+
+	_cgl.VERTEX_BUFFER_SIZE = 1024;
+	_cgl.POINTS = 1;
+	_cgl.LINES = 2;
+	_cgl.TRIANGLES = 3;
+	_cgl.QUADS = 4;
+
+	return _cgl;
+}(window.CGL || {}));
